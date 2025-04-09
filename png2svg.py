@@ -1,27 +1,87 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.8"
+# dependencies = [
+#   "pathlib>=1.0.1",
+#   "typer>=0.9.0",
+#   "rich>=13.6.0",
+# ]
+# [tool.uv]
+# exclude-newer = "2025-04-09T00:00:00Z"
+# ///
 """
 PNG to SVG Converter
 
 A command line tool to convert PNG images to SVG format using various methods.
+
+Run with: uv run png2svg.py --help
 """
 
-import argparse
 import os
 import subprocess
 import sys
+from enum import Enum
 from pathlib import Path
+from typing import Optional, List, Tuple, Dict, Any, Union
 import logging
+from datetime import datetime
 
-# Set up logging
+import typer
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.panel import Panel
+from rich.logging import RichHandler
+
+# Set up rich logging
 logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO,
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(rich_tracebacks=True)]
 )
-logger = logging.getLogger('png2svg')
+logger = logging.getLogger("png2svg")
+console = Console()
 
-def validate_file(file_path, check_exists=True, check_extension=None):
+# Create Typer app
+app = typer.Typer(
+    help="Convert PNG images to SVG format using various methods.",
+    add_completion=False,
+)
+
+class ConversionMethod(str, Enum):
+    """Conversion methods available for PNG to SVG conversion."""
+    AUTOTRACE = "autotrace"
+    POTRACE = "potrace"
+    ASPOSE = "aspose"
+    CONVERTAPI = "convertapi"
+
+def ensure_directory(file_path: Union[str, Path]) -> None:
+    """
+    Ensure the directory for the output file exists.
+    
+    Args:
+        file_path: Path to the file
+    """
+    directory = os.path.dirname(str(file_path))
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+        logger.info(f"Created directory: {directory}")
+
+def validate_file(file_path: Union[str, Path], check_exists: bool = True, 
+                  check_extension: Optional[str] = None) -> Path:
     """
     Validate file path.
+    
+    Args:
+        file_path: Path to the file
+        check_exists: Whether to check if the file exists
+        check_extension: Expected file extension
+        
+    Returns:
+        Path object for the file
+        
+    Raises:
+        FileNotFoundError: If file doesn't exist and check_exists is True
     """
     path = Path(file_path)
     
@@ -33,18 +93,17 @@ def validate_file(file_path, check_exists=True, check_extension=None):
     
     return path
 
-def ensure_directory(file_path):
-    """
-    Ensure the directory for the output file exists.
-    """
-    directory = os.path.dirname(file_path)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory)
-        logger.info(f"Created directory: {directory}")
-
-def convert_autotrace(input_file, output_file, options=None):
+def convert_autotrace(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
     """
     Convert PNG to SVG using autotrace.
+    
+    Args:
+        input_file: Path to input PNG file
+        output_file: Path to output SVG file
+        options: Custom options to pass to autotrace
+        
+    Returns:
+        True if conversion was successful, False otherwise
     """
     cmd = ["autotrace"]
     
@@ -69,9 +128,17 @@ def convert_autotrace(input_file, output_file, options=None):
             logger.error(f"Error details: {e.stderr}")
         return False
 
-def convert_potrace(input_file, output_file, options=None):
+def convert_potrace(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
     """
     Convert PNG to SVG using potrace.
+    
+    Args:
+        input_file: Path to input PNG file
+        output_file: Path to output SVG file
+        options: Custom options to pass to potrace
+        
+    Returns:
+        True if conversion was successful, False otherwise
     """
     # Potrace requires a bitmap file, so we need to convert PNG to PBM first
     pbm_file = f"{os.path.splitext(input_file)[0]}.pbm"
@@ -114,39 +181,55 @@ def convert_potrace(input_file, output_file, options=None):
         logger.error(f"Unexpected error: {e}")
         return False
 
-def convert_with_library(input_file, output_file, method='aspose'):
+def convert_with_library(input_file: str, output_file: str, method: str = 'aspose') -> bool:
     """
     Convert PNG to SVG using a Python library.
+    
+    Args:
+        input_file: Path to input PNG file
+        output_file: Path to output SVG file
+        method: Library to use for conversion ('aspose' or 'convertapi')
+        
+    Returns:
+        True if conversion was successful, False otherwise
     """
     if method == 'aspose':
         try:
-            import aspose.words as aw
-            doc = aw.Document()
-            builder = aw.DocumentBuilder(doc)
-            shape = builder.insert_image(input_file)
-            shape.get_shape_renderer().save(output_file, aw.saving.ImageSaveOptions(aw.SaveFormat.SVG))
-            return True
-        except ImportError:
-            logger.error("Aspose.Words library not found. Install with: pip install aspose-words")
-            return False
+            # Since we're not including aspose-words in the dependencies
+            # by default, we'll need to import it dynamically
+            import importlib
+            try:
+                aspose = importlib.import_module('aspose.words')
+                doc = aspose.Document()
+                builder = aspose.DocumentBuilder(doc)
+                shape = builder.insert_image(input_file)
+                shape.get_shape_renderer().save(output_file, aspose.saving.ImageSaveOptions(aspose.SaveFormat.SVG))
+                return True
+            except ImportError:
+                logger.error("Aspose.Words library not found. Use uv run --with aspose-words png2svg.py for Aspose method.")
+                return False
         except Exception as e:
             logger.error(f"Error during conversion with Aspose: {e}")
             return False
     elif method == 'convertapi':
         try:
-            import convertapi
-            api_key = os.environ.get('CONVERTAPI_KEY')
-            if not api_key:
-                logger.error("ConvertAPI key not found. Set the CONVERTAPI_KEY environment variable.")
+            # Since we're not including convertapi in the dependencies
+            # by default, we'll need to import it dynamically
+            import importlib
+            try:
+                convertapi = importlib.import_module('convertapi')
+                api_key = os.environ.get('CONVERTAPI_KEY')
+                if not api_key:
+                    logger.error("ConvertAPI key not found. Set the CONVERTAPI_KEY environment variable.")
+                    return False
+                
+                convertapi.api_secret = api_key
+                result = convertapi.convert('svg', {'File': input_file})
+                result.save_files(output_file)
+                return True
+            except ImportError:
+                logger.error("ConvertAPI library not found. Use uv run --with convertapi png2svg.py for ConvertAPI method.")
                 return False
-            
-            convertapi.api_secret = api_key
-            result = convertapi.convert('svg', {'File': input_file})
-            result.save_files(output_file)
-            return True
-        except ImportError:
-            logger.error("ConvertAPI library not found. Install with: pip install convertapi")
-            return False
         except Exception as e:
             logger.error(f"Error during conversion with ConvertAPI: {e}")
             return False
@@ -154,9 +237,25 @@ def convert_with_library(input_file, output_file, method='aspose'):
         logger.error(f"Unknown conversion method: {method}")
         return False
 
-def png_to_svg(input_file, output_file, method='autotrace', options=None, overwrite=False):
+def png_to_svg(
+    input_file: str, 
+    output_file: str, 
+    method: str = 'autotrace', 
+    options: Optional[str] = None, 
+    overwrite: bool = False
+) -> bool:
     """
     Convert a PNG file to SVG using the specified method.
+    
+    Args:
+        input_file: Path to input PNG file
+        output_file: Path to output SVG file
+        method: Conversion method to use
+        options: Custom options to pass to the converter
+        overwrite: Whether to overwrite the output file if it exists
+        
+    Returns:
+        True if conversion was successful, False otherwise
     """
     try:
         # Validate input file
@@ -174,20 +273,26 @@ def png_to_svg(input_file, output_file, method='autotrace', options=None, overwr
         ensure_directory(output_file)
         
         # Perform the conversion
-        success = False
-        
-        if method == 'autotrace':
-            success = convert_autotrace(str(input_path), output_file, options)
-        elif method == 'potrace':
-            success = convert_potrace(str(input_path), output_file, options)
-        elif method in ['aspose', 'convertapi']:
-            success = convert_with_library(str(input_path), output_file, method)
-        else:
-            logger.error(f"Unknown conversion method: {method}")
-            return False
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            progress.add_task(f"[green]Converting {input_path.name} to {output_path.name}...", total=None)
+            
+            if method == 'autotrace':
+                success = convert_autotrace(str(input_path), output_file, options)
+            elif method == 'potrace':
+                success = convert_potrace(str(input_path), output_file, options)
+            elif method in ['aspose', 'convertapi']:
+                success = convert_with_library(str(input_path), output_file, method)
+            else:
+                logger.error(f"Unknown conversion method: {method}")
+                return False
         
         if success:
-            logger.info(f"Conversion successful! SVG saved at: {output_file}")
+            console.print(f"[green]Conversion successful! SVG saved at: {output_file}")
             return True
         else:
             return False
@@ -196,9 +301,27 @@ def png_to_svg(input_file, output_file, method='autotrace', options=None, overwr
         logger.error(f"Error during conversion: {e}")
         return False
 
-def batch_convert(input_dir, output_dir, method='autotrace', options=None, overwrite=False, recursive=False):
+def batch_convert(
+    input_dir: str, 
+    output_dir: str, 
+    method: str = 'autotrace', 
+    options: Optional[str] = None, 
+    overwrite: bool = False, 
+    recursive: bool = False
+) -> bool:
     """
     Batch convert PNG files in a directory to SVG.
+    
+    Args:
+        input_dir: Input directory containing PNG files
+        output_dir: Output directory for SVG files
+        method: Conversion method to use
+        options: Custom options to pass to the converter
+        overwrite: Whether to overwrite existing output files
+        recursive: Whether to recursively process subdirectories
+        
+    Returns:
+        True if at least one file was converted successfully, False otherwise
     """
     input_path = Path(input_dir)
     
@@ -220,107 +343,120 @@ def batch_convert(input_dir, output_dir, method='autotrace', options=None, overw
     
     success_count = 0
     
-    for png_file in png_files:
-        # Determine the output file path
-        rel_path = png_file.relative_to(input_path) if recursive else png_file.name
-        output_file = Path(output_dir) / rel_path.with_suffix('.svg')
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"[green]Converting files...", total=len(png_files))
         
-        # Ensure output directory exists
-        ensure_directory(str(output_file))
-        
-        logger.info(f"Converting {png_file} to {output_file}")
-        
-        if png_to_svg(str(png_file), str(output_file), method, options, overwrite):
-            success_count += 1
+        for png_file in png_files:
+            # Determine the output file path
+            rel_path = png_file.relative_to(input_path) if recursive else png_file.name
+            output_file = Path(output_dir) / rel_path.with_suffix('.svg')
+            
+            # Ensure output directory exists
+            ensure_directory(str(output_file))
+            
+            progress.update(task, description=f"[green]Converting {png_file.name}...")
+            
+            if png_to_svg(str(png_file), str(output_file), method, options, overwrite):
+                success_count += 1
+            
+            progress.advance(task)
     
-    logger.info(f"Conversion completed: {success_count} of {len(png_files)} files converted successfully")
+    console.print(f"[green]Conversion completed: {success_count} of {len(png_files)} files converted successfully")
     return success_count > 0
 
-def main():
-    """
-    Main entry point for the CLI.
-    """
-    parser = argparse.ArgumentParser(
-        description="Convert PNG images to SVG format.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Convert a single file
-  png2svg input.png output.svg
-  
-  # Use a specific conversion method
-  png2svg input.png output.svg --method potrace
-  
-  # Batch convert all PNGs in a directory
-  png2svg --batch input_dir/ output_dir/
-  
-  # Batch convert with recursive search
-  png2svg --batch input_dir/ output_dir/ --recursive
-  
-  # Pass custom options to the converter
-  png2svg input.png output.svg --options "--filter-iterations 4 --dpi 300"
-        """
-    )
-    
-    # Mode selection (single file or batch)
-    mode_group = parser.add_mutually_exclusive_group(required=True)
-    
-    mode_group.add_argument("--batch", action="store_true", 
-                         help="Batch convert PNG files in a directory")
-    
-    mode_group.add_argument("input_file", nargs="?", 
-                         help="Path to the input PNG file")
-    
-    parser.add_argument("output_file", nargs="?",
-                     help="Path to the output SVG file")
-    
-    # Options for both modes
-    parser.add_argument("--method", choices=["autotrace", "potrace", "aspose", "convertapi"],
-                     default="autotrace", help="Conversion method to use (default: autotrace)")
-    
-    parser.add_argument("--options", 
-                     help="Custom options to pass to the converter (e.g., '--filter-iterations 4')")
-    
-    parser.add_argument("--overwrite", action="store_true",
-                     help="Overwrite output file if it exists")
-    
-    parser.add_argument("--verbose", "-v", action="store_true",
-                     help="Enable verbose logging")
-    
-    # Options for batch mode
-    parser.add_argument("--recursive", "-r", action="store_true",
-                     help="Recursively process directories (batch mode only)")
-    
-    args = parser.parse_args()
-    
-    # Set log level
-    if args.verbose:
+@app.command()
+def convert(
+    input_file: str = typer.Argument(..., help="Path to the input PNG file"),
+    output_file: str = typer.Argument(..., help="Path to the output SVG file"),
+    method: ConversionMethod = typer.Option(
+        ConversionMethod.AUTOTRACE, 
+        help="Conversion method to use"
+    ),
+    options: Optional[str] = typer.Option(
+        None, 
+        help="Custom options to pass to the converter (e.g., '--filter-iterations 4')"
+    ),
+    overwrite: bool = typer.Option(
+        False, 
+        help="Overwrite output file if it exists"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v",
+        help="Enable verbose logging"
+    ),
+) -> None:
+    """Convert a single PNG file to SVG."""
+    if verbose:
         logger.setLevel(logging.DEBUG)
     
-    # Process based on mode
-    if args.batch:
-        if not args.input_file or not args.output_file:
-            parser.error("--batch mode requires both input_dir and output_dir")
-        
-        return 0 if batch_convert(
-            args.input_file, 
-            args.output_file, 
-            args.method, 
-            args.options, 
-            args.overwrite, 
-            args.recursive
-        ) else 1
-    else:
-        if not args.input_file or not args.output_file:
-            parser.error("Single file mode requires both input_file and output_file")
-        
-        return 0 if png_to_svg(
-            args.input_file, 
-            args.output_file, 
-            args.method, 
-            args.options, 
-            args.overwrite
-        ) else 1
+    if not png_to_svg(input_file, output_file, method.value, options, overwrite):
+        sys.exit(1)
+
+@app.command()
+def batch(
+    input_dir: str = typer.Argument(..., help="Directory containing PNG files"),
+    output_dir: str = typer.Argument(..., help="Directory to save SVG files"),
+    method: ConversionMethod = typer.Option(
+        ConversionMethod.AUTOTRACE, 
+        help="Conversion method to use"
+    ),
+    options: Optional[str] = typer.Option(
+        None, 
+        help="Custom options to pass to the converter (e.g., '--filter-iterations 4')"
+    ),
+    overwrite: bool = typer.Option(
+        False, 
+        help="Overwrite output files if they exist"
+    ),
+    recursive: bool = typer.Option(
+        False, "--recursive", "-r",
+        help="Recursively process subdirectories"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v",
+        help="Enable verbose logging"
+    ),
+) -> None:
+    """Batch convert PNG files in a directory to SVG."""
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+    
+    if not batch_convert(input_dir, output_dir, method.value, options, overwrite, recursive):
+        sys.exit(1)
+
+def show_welcome() -> None:
+    """Show a welcome message with information about the tool."""
+    console.print(Panel.fit(
+        "[bold blue]PNG to SVG Converter[/bold blue]\n\n"
+        "A command line tool to convert PNG images to SVG format using various methods.\n\n"
+        "[yellow]Methods available:[/yellow]\n"
+        "- [green]autotrace[/green]: Uses the AutoTrace command-line tool\n"
+        "- [green]potrace[/green]: Uses Potrace with ImageMagick for preprocessing\n"
+        "- [green]aspose[/green]: Uses the Aspose.Words Python library\n"
+        "- [green]convertapi[/green]: Uses the ConvertAPI web service\n\n"
+        "[yellow]Examples:[/yellow]\n"
+        "[grey]# Convert a single file[/grey]\n"
+        "uv run png2svg.py convert input.png output.svg\n\n"
+        "[grey]# Batch convert all PNGs in a directory[/grey]\n"
+        "uv run png2svg.py batch input_dir/ output_dir/",
+        title="Welcome",
+        border_style="blue",
+    ))
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context) -> None:
+    """PNG to SVG Converter main entry point."""
+    if ctx.invoked_subcommand is None:
+        show_welcome()
+        sys.exit(0)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Add timestamp to startup log
+    startup_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logger.debug(f"PNG to SVG Converter started at {startup_time}")
+    
+    app()
