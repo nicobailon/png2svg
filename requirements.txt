@@ -1,0 +1,15 @@
+# Core dependencies
+pathlib>=1.0.1
+
+# Optional dependencies based on conversion method
+# Uncomment as needed
+
+# For aspose method
+# aspose-words>=23.10.0
+
+# For convertapi method
+# convertapi>=2.0.0
+
+# For testing
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
