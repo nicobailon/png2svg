@@ -10,9 +10,9 @@ A command-line utility to convert PNG images to SVG format using various convers
 - Batch convert entire directories of PNG files
 - Recursive directory processing
 - Multiple conversion methods:
-  - AutoTrace (default, falls back to Pillow if not installed)
-  - Potrace (falls back to Pillow if not installed)
-  - Pillow (built-in, always available)
+  - Native (default, pure Python implementation with no external dependencies)
+  - AutoTrace (falls back to native if not installed)
+  - Potrace (falls back to native if not installed)
   - Aspose.Words API
   - ConvertAPI
 - PEP 723 inline script metadata for easy dependency management with uv
@@ -33,29 +33,26 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert logo.png logo.svg
 ```
 
-**NEW!** The tool now includes a built-in Pillow-based converter that works without any external dependencies, ensuring you can always convert your PNG files to SVG directly!
+**NEW!** The tool now uses a pure Python implementation as the default method, ensuring you can always convert your PNG files to SVG without any external dependencies!
 
 ## Usage
 
 ### Basic Usage
 
-Convert a single PNG file to SVG:
+Convert a single PNG file to SVG using the built-in native method:
 
 ```bash
-# If you've downloaded the script locally:
-uv run png2svg.py convert input.png output.svg
-
-# Or run directly from GitHub:
+# Run directly from GitHub (no dependencies needed):
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg
 ```
 
 ### Using Different Conversion Methods
 
 ```bash
-# Using built-in Pillow method (no external dependencies)
-uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method pillow
+# Using AutoTrace (if installed, falls back to native if not)
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method autotrace
 
-# Using Potrace (if installed, falls back to Pillow if not)
+# Using Potrace (if installed, falls back to native if not)
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method potrace
 
 # Using Aspose.Words API (will automatically add aspose-words dependency)
@@ -79,8 +76,8 @@ uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py batc
 ### Advanced Options
 
 ```bash
-# Pass custom options to the converter
-uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --options "--filter-iterations 4 --dpi 300"
+# Pass custom options to the converter (for external tools)
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method autotrace --options "--filter-iterations 4 --dpi 300"
 
 # Overwrite existing output files
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --overwrite
@@ -91,7 +88,7 @@ uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py conv
 
 ## External Dependencies (Optional)
 
-The script includes a built-in Pillow-based converter that works without any external tools. However, for better quality conversions, you may want to install the following tools:
+The script includes a built-in native pure Python converter that works without any external tools. However, for better quality conversions, you may want to install the following tools:
 
 ### On Debian/Ubuntu:
 ```bash
@@ -103,27 +100,27 @@ apt-get install autotrace potrace imagemagick
 brew install autotrace potrace imagemagick
 ```
 
-If these tools aren't installed, the script will automatically fall back to the built-in Pillow converter.
+If these tools aren't installed, the script will automatically use the native method.
 
 ## How It Works
 
 This tool uses different methods to convert PNG raster images to SVG vector graphics:
 
-1. **AutoTrace**: Uses the AutoTrace command-line tool to trace bitmap images (falls back to Pillow if not installed)
-2. **Potrace**: Uses Potrace (with ImageMagick for preprocessing) for high-quality vector tracing (falls back to Pillow if not installed)
-3. **Pillow**: Pure Python conversion using Pillow and CairoSVG (always available)
-4. **Aspose.Words**: Uses the Aspose.Words Python library for conversion
-5. **ConvertAPI**: Uses the ConvertAPI web service for conversion
+1. **Native**: Pure Python conversion using PIL and svgwrite libraries (default, always works)
+2. **AutoTrace**: Uses the AutoTrace command-line tool to trace bitmap images (falls back to native if not installed)
+3. **Potrace**: Uses Potrace (with ImageMagick for preprocessing) for high-quality vector tracing (falls back to native if not installed)
+4. **Aspose.Words**: Uses the Aspose.Words Python library for conversion (falls back to native if not installed)
+5. **ConvertAPI**: Uses the ConvertAPI web service for conversion (falls back to native if not installed)
 
 The best method depends on your specific image and needs:
+- Native method works on all systems without any external dependencies
 - AutoTrace works well for simple images and logos
 - Potrace often provides better results for complex images
-- Pillow is always available and works without any external dependencies
-- The API-based methods can be useful when you can't install external tools
+- The API-based methods can be useful for specific conversion requirements
 
 ## Dependency Management
 
-This tool uses PEP 723 inline script metadata and uv for dependency management. The core dependencies (typer, rich, pathlib, pillow, cairosvg) are automatically installed when you run the script with `uv run`. 
+This tool uses PEP 723 inline script metadata and uv for dependency management. The core dependencies (typer, rich, pathlib, pillow, svgwrite) are automatically installed when you run the script with `uv run`. 
 
 For Aspose or ConvertAPI methods, the script will notify you if additional dependencies are needed. You can add them like this:
 
