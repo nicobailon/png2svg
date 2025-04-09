@@ -5,6 +5,8 @@
 #   "pathlib>=1.0.1",
 #   "typer>=0.9.0",
 #   "rich>=13.6.0",
+#   "cairosvg>=2.7.0",
+#   "Pillow>=10.0.0",
 # ]
 # [tool.uv]
 # exclude-newer = "2025-04-09T00:00:00Z"
@@ -20,17 +22,22 @@ Run with: uv run png2svg.py --help
 import os
 import subprocess
 import sys
+import tempfile
+import shutil
 from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Tuple, Dict, Any, Union
 import logging
 from datetime import datetime
+import io
 
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 from rich.logging import RichHandler
+from PIL import Image
+import cairosvg
 
 # Set up rich logging
 logging.basicConfig(
@@ -52,6 +59,7 @@ class ConversionMethod(str, Enum):
     """Conversion methods available for PNG to SVG conversion."""
     AUTOTRACE = "autotrace"
     POTRACE = "potrace"
+    PILLOW = "pillow"
     ASPOSE = "aspose"
     CONVERTAPI = "convertapi"
 
@@ -93,6 +101,62 @@ def validate_file(file_path: Union[str, Path], check_exists: bool = True,
     
     return path
 
+def is_command_available(command: str) -> bool:
+    """
+    Check if a command is available on the system.
+    
+    Args:
+        command: The command to check
+        
+    Returns:
+        True if the command is available, False otherwise
+    """
+    return shutil.which(command) is not None
+
+def convert_pillow(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
+    """
+    Convert PNG to SVG using Pillow and CairoSVG.
+    This is a native Python method that doesn't require external tools.
+    
+    Args:
+        input_file: Path to input PNG file
+        output_file: Path to output SVG file
+        options: Custom options (not used for this method)
+        
+    Returns:
+        True if conversion was successful, False otherwise
+    """
+    try:
+        # Use Pillow to read the PNG and CairoSVG to write the SVG
+        img = Image.open(input_file)
+        
+        # Save as an SVG using a simple path approach
+        # We'll create a simple SVG with the image embedded as a data URL
+        width, height = img.size
+        
+        # Convert to PNG data URL
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format="PNG")
+        img_data = img_buffer.getvalue()
+        
+        # Create a basic SVG with the image embedded
+        svg_content = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+     width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <image width="{width}" height="{height}" x="0" y="0" 
+         xlink:href="data:image/png;base64,{img_data.hex()}"/>
+</svg>
+"""
+        
+        # Write the SVG file
+        with open(output_file, 'w') as f:
+            f.write(svg_content)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error during conversion with Pillow: {e}")
+        return False
+
 def convert_autotrace(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
     """
     Convert PNG to SVG using autotrace.
@@ -105,6 +169,13 @@ def convert_autotrace(input_file: str, output_file: str, options: Optional[str] 
     Returns:
         True if conversion was successful, False otherwise
     """
+    if not is_command_available("autotrace"):
+        logger.warning("AutoTrace is not installed. It's recommended for best results.")
+        logger.warning("Install on Ubuntu/Debian: sudo apt-get install autotrace")
+        logger.warning("Install on macOS: brew install autotrace")
+        logger.warning("Falling back to built-in method...")
+        return convert_pillow(input_file, output_file, options)
+    
     cmd = ["autotrace"]
     
     if options:
@@ -119,9 +190,6 @@ def convert_autotrace(input_file: str, output_file: str, options: Optional[str] 
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return True
-    except FileNotFoundError:
-        logger.error("Error: autotrace is not installed. Please install it first.")
-        return False
     except subprocess.CalledProcessError as e:
         logger.error(f"Error during conversion with autotrace: {e}")
         if e.stderr:
@@ -140,6 +208,13 @@ def convert_potrace(input_file: str, output_file: str, options: Optional[str] = 
     Returns:
         True if conversion was successful, False otherwise
     """
+    if not is_command_available("potrace") or not is_command_available("convert"):
+        logger.warning("Potrace or ImageMagick (convert) is not installed.")
+        logger.warning("Install on Ubuntu/Debian: sudo apt-get install potrace imagemagick")
+        logger.warning("Install on macOS: brew install potrace imagemagick")
+        logger.warning("Falling back to built-in method...")
+        return convert_pillow(input_file, output_file, options)
+    
     # Potrace requires a bitmap file, so we need to convert PNG to PBM first
     pbm_file = f"{os.path.splitext(input_file)[0]}.pbm"
     
@@ -168,10 +243,6 @@ def convert_potrace(input_file: str, output_file: str, options: Optional[str] = 
         os.remove(pbm_file)
         
         return True
-    except FileNotFoundError as e:
-        logger.error(f"Required tool not found: {e.filename}")
-        logger.error("Please install ImageMagick and potrace.")
-        return False
     except subprocess.CalledProcessError as e:
         logger.error(f"Error during conversion with potrace: {e}")
         if e.stderr:
@@ -207,7 +278,8 @@ def convert_with_library(input_file: str, output_file: str, method: str = 'aspos
                 return True
             except ImportError:
                 logger.error("Aspose.Words library not found. Use uv run --with aspose-words png2svg.py for Aspose method.")
-                return False
+                logger.warning("Falling back to built-in method...")
+                return convert_pillow(input_file, output_file)
         except Exception as e:
             logger.error(f"Error during conversion with Aspose: {e}")
             return False
@@ -221,7 +293,8 @@ def convert_with_library(input_file: str, output_file: str, method: str = 'aspos
                 api_key = os.environ.get('CONVERTAPI_KEY')
                 if not api_key:
                     logger.error("ConvertAPI key not found. Set the CONVERTAPI_KEY environment variable.")
-                    return False
+                    logger.warning("Falling back to built-in method...")
+                    return convert_pillow(input_file, output_file)
                 
                 convertapi.api_secret = api_key
                 result = convertapi.convert('svg', {'File': input_file})
@@ -229,7 +302,8 @@ def convert_with_library(input_file: str, output_file: str, method: str = 'aspos
                 return True
             except ImportError:
                 logger.error("ConvertAPI library not found. Use uv run --with convertapi png2svg.py for ConvertAPI method.")
-                return False
+                logger.warning("Falling back to built-in method...")
+                return convert_pillow(input_file, output_file)
         except Exception as e:
             logger.error(f"Error during conversion with ConvertAPI: {e}")
             return False
@@ -285,6 +359,8 @@ def png_to_svg(
                 success = convert_autotrace(str(input_path), output_file, options)
             elif method == 'potrace':
                 success = convert_potrace(str(input_path), output_file, options)
+            elif method == 'pillow':
+                success = convert_pillow(str(input_path), output_file, options)
             elif method in ['aspose', 'convertapi']:
                 success = convert_with_library(str(input_path), output_file, method)
             else:
@@ -434,8 +510,9 @@ def show_welcome() -> None:
         "[bold blue]PNG to SVG Converter[/bold blue]\n\n"
         "A command line tool to convert PNG images to SVG format using various methods.\n\n"
         "[yellow]Methods available:[/yellow]\n"
-        "- [green]autotrace[/green]: Uses the AutoTrace command-line tool\n"
-        "- [green]potrace[/green]: Uses Potrace with ImageMagick for preprocessing\n"
+        "- [green]autotrace[/green]: Uses the AutoTrace command-line tool (falls back to Pillow if not available)\n"
+        "- [green]potrace[/green]: Uses Potrace with ImageMagick for preprocessing (falls back to Pillow if not available)\n"
+        "- [green]pillow[/green]: Pure Python conversion using Pillow (always available)\n"
         "- [green]aspose[/green]: Uses the Aspose.Words Python library\n"
         "- [green]convertapi[/green]: Uses the ConvertAPI web service\n\n"
         "[yellow]Examples:[/yellow]\n"
