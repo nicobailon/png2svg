@@ -10,8 +10,9 @@ A command-line utility to convert PNG images to SVG format using various convers
 - Batch convert entire directories of PNG files
 - Recursive directory processing
 - Multiple conversion methods:
-  - AutoTrace (default)
-  - Potrace
+  - AutoTrace (default, falls back to Pillow if not installed)
+  - Potrace (falls back to Pillow if not installed)
+  - Pillow (built-in, always available)
   - Aspose.Words API
   - ConvertAPI
 - PEP 723 inline script metadata for easy dependency management with uv
@@ -32,7 +33,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert logo.png logo.svg
 ```
 
-No need to clone the repository or manually install dependencies - just run it directly!
+**NEW!** The tool now includes a built-in Pillow-based converter that works without any external dependencies, ensuring you can always convert your PNG files to SVG directly!
 
 ## Usage
 
@@ -51,7 +52,10 @@ uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py conv
 ### Using Different Conversion Methods
 
 ```bash
-# Using Potrace
+# Using built-in Pillow method (no external dependencies)
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method pillow
+
+# Using Potrace (if installed, falls back to Pillow if not)
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method potrace
 
 # Using Aspose.Words API (will automatically add aspose-words dependency)
@@ -85,9 +89,9 @@ uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py conv
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --verbose
 ```
 
-## External Dependencies
+## External Dependencies (Optional)
 
-For AutoTrace and Potrace methods, you need to install external tools:
+The script includes a built-in Pillow-based converter that works without any external tools. However, for better quality conversions, you may want to install the following tools:
 
 ### On Debian/Ubuntu:
 ```bash
@@ -99,23 +103,27 @@ apt-get install autotrace potrace imagemagick
 brew install autotrace potrace imagemagick
 ```
 
+If these tools aren't installed, the script will automatically fall back to the built-in Pillow converter.
+
 ## How It Works
 
 This tool uses different methods to convert PNG raster images to SVG vector graphics:
 
-1. **AutoTrace**: Uses the AutoTrace command-line tool to trace bitmap images
-2. **Potrace**: Uses Potrace (with ImageMagick for preprocessing) for high-quality vector tracing
-3. **Aspose.Words**: Uses the Aspose.Words Python library for conversion
-4. **ConvertAPI**: Uses the ConvertAPI web service for conversion
+1. **AutoTrace**: Uses the AutoTrace command-line tool to trace bitmap images (falls back to Pillow if not installed)
+2. **Potrace**: Uses Potrace (with ImageMagick for preprocessing) for high-quality vector tracing (falls back to Pillow if not installed)
+3. **Pillow**: Pure Python conversion using Pillow and CairoSVG (always available)
+4. **Aspose.Words**: Uses the Aspose.Words Python library for conversion
+5. **ConvertAPI**: Uses the ConvertAPI web service for conversion
 
 The best method depends on your specific image and needs:
 - AutoTrace works well for simple images and logos
 - Potrace often provides better results for complex images
+- Pillow is always available and works without any external dependencies
 - The API-based methods can be useful when you can't install external tools
 
 ## Dependency Management
 
-This tool uses PEP 723 inline script metadata and uv for dependency management. The core dependencies (typer, rich, pathlib) are automatically installed when you run the script with `uv run`. 
+This tool uses PEP 723 inline script metadata and uv for dependency management. The core dependencies (typer, rich, pathlib, pillow, cairosvg) are automatically installed when you run the script with `uv run`. 
 
 For Aspose or ConvertAPI methods, the script will notify you if additional dependencies are needed. You can add them like this:
 
