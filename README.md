@@ -1,6 +1,6 @@
 # png2svg
 
-A command-line utility to convert PNG images to SVG format using various conversion methods.
+A command-line utility to convert PNG images to SVG format using various conversion methods, with built-in dependency management via uv.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -14,26 +14,21 @@ A command-line utility to convert PNG images to SVG format using various convers
   - Potrace
   - Aspose.Words API
   - ConvertAPI
-- Custom conversion options
+- PEP 723 inline script metadata for easy dependency management with uv
+- Rich progress indicators and better terminal output
 - Comprehensive error handling
 - Detailed logging
 
-## Installation
+## Quick Start
+
+This tool uses [uv](https://github.com/astral-sh/uv) and inline script metadata ([PEP 723](https://peps.python.org/pep-0723/)) for dependency management, making it extremely easy to run without manual installation:
 
 ```bash
-# Clone the repository
-git clone https://github.com/nicobailon/png2svg.git
-cd png2svg
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Install external dependencies (for AutoTrace and Potrace methods)
-# On Debian/Ubuntu:
-apt-get install autotrace potrace imagemagick
-
-# On macOS with Homebrew:
-brew install autotrace potrace imagemagick
+# Run the script directly (will install dependencies automatically)
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py
 ```
 
 ## Usage
@@ -43,81 +38,58 @@ brew install autotrace potrace imagemagick
 Convert a single PNG file to SVG:
 
 ```bash
-python png2svg.py input.png output.svg
+uv run png2svg.py convert input.png output.svg
 ```
 
 ### Using Different Conversion Methods
 
 ```bash
 # Using Potrace
-python png2svg.py input.png output.svg --method potrace
+uv run png2svg.py convert input.png output.svg --method potrace
 
-# Using Aspose.Words API
-python png2svg.py input.png output.svg --method aspose
+# Using Aspose.Words API (will automatically add aspose-words dependency)
+uv run --with aspose-words png2svg.py convert input.png output.svg --method aspose
 
 # Using ConvertAPI (requires API key)
 export CONVERTAPI_KEY="your-api-key"
-python png2svg.py input.png output.svg --method convertapi
+uv run --with convertapi png2svg.py convert input.png output.svg --method convertapi
 ```
 
 ### Batch Convert Multiple Files
 
 ```bash
 # Convert all PNGs in a directory
-python png2svg.py --batch input_dir/ output_dir/
+uv run png2svg.py batch input_dir/ output_dir/
 
 # Convert recursively
-python png2svg.py --batch input_dir/ output_dir/ --recursive
+uv run png2svg.py batch input_dir/ output_dir/ --recursive
 ```
 
 ### Advanced Options
 
 ```bash
 # Pass custom options to the converter
-python png2svg.py input.png output.svg --options "--filter-iterations 4 --dpi 300"
+uv run png2svg.py convert input.png output.svg --options "--filter-iterations 4 --dpi 300"
 
 # Overwrite existing output files
-python png2svg.py input.png output.svg --overwrite
+uv run png2svg.py convert input.png output.svg --overwrite
 
 # Enable verbose logging
-python png2svg.py input.png output.svg --verbose
+uv run png2svg.py convert input.png output.svg --verbose
 ```
 
-## Full Command Reference
+## External Dependencies
 
-```
-usage: png2svg.py [-h] (--batch | [input_file]) [output_file] 
-                  [--method {autotrace,potrace,aspose,convertapi}]
-                  [--options OPTIONS] [--overwrite] [--verbose] [--recursive]
+For AutoTrace and Potrace methods, you need to install external tools:
 
-Convert PNG images to SVG format.
-
-positional arguments:
-  input_file            Path to the input PNG file
-  output_file           Path to the output SVG file
-
-options:
-  -h, --help            show this help message and exit
-  --batch               Batch convert PNG files in a directory
-  --method {autotrace,potrace,aspose,convertapi}
-                        Conversion method to use (default: autotrace)
-  --options OPTIONS     Custom options to pass to the converter (e.g., '--filter-iterations 4')
-  --overwrite           Overwrite output file if it exists
-  --verbose, -v         Enable verbose logging
-  --recursive, -r       Recursively process directories (batch mode only)
-```
-
-## Examples
-
+### On Debian/Ubuntu:
 ```bash
-# Convert a simple icon
-python png2svg.py icon.png icon.svg
+apt-get install autotrace potrace imagemagick
+```
 
-# Convert a photo with optimized settings
-python png2svg.py photo.png photo.svg --method potrace --options "--dpi 300 --filter-iterations 4"
-
-# Batch convert website assets
-python png2svg.py --batch assets/images/ assets/vectors/ --recursive
+### On macOS with Homebrew:
+```bash
+brew install autotrace potrace imagemagick
 ```
 
 ## How It Works
@@ -134,25 +106,21 @@ The best method depends on your specific image and needs:
 - Potrace often provides better results for complex images
 - The API-based methods can be useful when you can't install external tools
 
-## Dependencies
+## Dependency Management
 
-- Python 3.6+
-- For `autotrace` method: AutoTrace (external program)
-- For `potrace` method: Potrace and ImageMagick (external programs)
-- For `aspose` method: aspose-words Python library
-- For `convertapi` method: convertapi Python library and API key
+This tool uses PEP 723 inline script metadata and uv for dependency management. The core dependencies (typer, rich, pathlib) are automatically installed when you run the script with `uv run`. 
 
-## Development
-
-### Testing
-
-Run the tests with:
+For Aspose or ConvertAPI methods, the script will notify you if additional dependencies are needed. You can add them like this:
 
 ```bash
-pytest
+# For Aspose method
+uv run --with aspose-words png2svg.py convert input.png output.svg --method aspose
+
+# For ConvertAPI method
+uv run --with convertapi png2svg.py convert input.png output.svg --method convertapi
 ```
 
-### Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
