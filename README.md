@@ -1,61 +1,78 @@
 # png2svg
 
-A command-line utility to convert PNG images to SVG format using various conversion methods, with built-in dependency management via uv.
+A command-line utility to convert PNG images to SVG format using various conversion methods.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+## What Does This Tool Do?
+
+This tool takes your PNG images and converts them to SVG format. SVG files are vector-based, which means they can be scaled to any size without losing quality - perfect for logos, icons, and other graphics.
+
+## Quick Start (The Easy Way)
+
+This tool uses a modern Python package manager called `uv` to run without any complicated installation steps:
+
+### 1. Install uv (if you don't have it already)
+
+`uv` is a super-fast Python package manager written in Rust. It lets you run Python scripts without having to manually install dependencies or set up virtual environments - it handles all of that automatically.
+
+```bash
+# On macOS or Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# On Windows:
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+After installation, you might need to restart your terminal or add uv to your PATH.
+
+### 2. Run the conversion tool directly
+
+```bash
+# Convert a single PNG file to SVG:
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert logo.png logo.svg
+```
+
+That's it! The command above will:
+- Download the script
+- Install all needed dependencies in an isolated environment
+- Run the conversion
+- Clean up afterward
+
+No cloning repositories, no `pip install`, no mess left on your system!
 
 ## Features
 
 - Convert individual PNG files to SVG
 - Batch convert entire directories of PNG files
-- Recursive directory processing
-- Multiple conversion methods:
-  - Native (default, pure Python implementation with no external dependencies)
-  - AutoTrace (falls back to native if not installed)
-  - Potrace (falls back to native if not installed)
-  - Aspose.Words API
-  - ConvertAPI
-- PEP 723 inline script metadata for easy dependency management with uv
-- Rich progress indicators and better terminal output
-- Comprehensive error handling
-- Detailed logging
+- Multiple conversion methods to choose from:
+  - **Native** (default): Works everywhere with just Python packages
+  - **AutoTrace**: Higher quality for simple images (if you have it installed)
+  - **Potrace**: Great for photos and complex images (if you have it installed)
+  - **Aspose.Words API**: Commercial-grade conversion
+  - **ConvertAPI**: Web-based conversion service
+- Smart fallback: Automatically uses the native method if external tools aren't available
+- Built-in help and clear error messages
 
-## Quick Start
+## Detailed Usage Examples
 
-This tool uses [uv](https://github.com/astral-sh/uv) and inline script metadata ([PEP 723](https://peps.python.org/pep-0723/)) for dependency management, making it extremely easy to run without manual installation:
+### Convert a Single File
 
 ```bash
-# Install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Run the script directly without cloning the repository
-# Dependencies will be installed automatically
-uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert logo.png logo.svg
-```
-
-**NEW!** The tool now uses a pure Python implementation as the default method, ensuring you can always convert your PNG files to SVG without any external dependencies!
-
-## Usage
-
-### Basic Usage
-
-Convert a single PNG file to SVG using the built-in native method:
-
-```bash
-# Run directly from GitHub (no dependencies needed):
+# Basic conversion using the default method (works everywhere)
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg
 ```
 
 ### Using Different Conversion Methods
 
 ```bash
-# Using AutoTrace (if installed, falls back to native if not)
+# Using AutoTrace (falls back to native if not installed)
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method autotrace
 
-# Using Potrace (if installed, falls back to native if not)
+# Using Potrace (falls back to native if not installed)
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method potrace
 
-# Using Aspose.Words API (will automatically add aspose-words dependency)
+# Using Aspose.Words API
 uv run --with aspose-words https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method aspose
 
 # Using ConvertAPI (requires API key)
@@ -69,7 +86,7 @@ uv run --with convertapi https://raw.githubusercontent.com/nicobailon/png2svg/ma
 # Convert all PNGs in a directory
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py batch input_dir/ output_dir/
 
-# Convert recursively
+# Convert recursively (including subdirectories)
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py batch input_dir/ output_dir/ --recursive
 ```
 
@@ -86,51 +103,58 @@ uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py conv
 uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --verbose
 ```
 
-## External Dependencies (Optional)
+## How It Works
 
-The script includes a built-in native pure Python converter that works without any external tools. However, for better quality conversions, you may want to install the following tools:
+### What Makes This Tool Special?
 
-### On Debian/Ubuntu:
+This tool leverages several modern Python features:
+
+1. **PEP 723 Inline Script Metadata**: The script includes its own dependency information, making it fully self-contained
+2. **uv Package Manager**: Automatically handles dependencies without global installation
+3. **Pure Python Fallbacks**: Always works even if you don't have external tools installed
+
+### Conversion Methods Explained
+
+1. **Native**: Pure Python conversion using PIL and svgwrite libraries (default, always works)
+2. **AutoTrace**: Uses the AutoTrace command-line tool for better quality tracing (optional)
+3. **Potrace**: Uses Potrace for high-quality vector tracing (optional)
+4. **Aspose.Words**: Professional conversion library
+5. **ConvertAPI**: Web-based conversion service
+
+The native method works everywhere without any additional software. The other methods can provide better quality in specific situations but require additional software or services.
+
+## Optional External Tools
+
+For the best conversion quality with the AutoTrace or Potrace methods, you might want to install additional software:
+
+### On Ubuntu/Debian:
 ```bash
-apt-get install autotrace potrace imagemagick
+sudo apt-get install autotrace potrace imagemagick
 ```
 
-### On macOS with Homebrew:
+### On macOS:
 ```bash
 brew install autotrace potrace imagemagick
 ```
 
-If these tools aren't installed, the script will automatically use the native method.
+### On Windows:
+These tools are available but installation is more complex. The native method is recommended on Windows.
 
-## How It Works
+If these tools aren't installed, the script will automatically use the pure Python method without any error.
 
-This tool uses different methods to convert PNG raster images to SVG vector graphics:
+## Why Use This Approach?
 
-1. **Native**: Pure Python conversion using PIL and svgwrite libraries (default, always works)
-2. **AutoTrace**: Uses the AutoTrace command-line tool to trace bitmap images (falls back to native if not installed)
-3. **Potrace**: Uses Potrace (with ImageMagick for preprocessing) for high-quality vector tracing (falls back to native if not installed)
-4. **Aspose.Words**: Uses the Aspose.Words Python library for conversion (falls back to native if not installed)
-5. **ConvertAPI**: Uses the ConvertAPI web service for conversion (falls back to native if not installed)
+Traditional Python tools usually require you to:
+1. Clone a repository
+2. Create a virtual environment
+3. Install dependencies
+4. Remember how to activate the environment later
 
-The best method depends on your specific image and needs:
-- Native method works on all systems without any external dependencies
-- AutoTrace works well for simple images and logos
-- Potrace often provides better results for complex images
-- The API-based methods can be useful for specific conversion requirements
-
-## Dependency Management
-
-This tool uses PEP 723 inline script metadata and uv for dependency management. The core dependencies (typer, rich, pathlib, pillow, svgwrite) are automatically installed when you run the script with `uv run`. 
-
-For Aspose or ConvertAPI methods, the script will notify you if additional dependencies are needed. You can add them like this:
-
-```bash
-# For Aspose method
-uv run --with aspose-words https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method aspose
-
-# For ConvertAPI method
-uv run --with convertapi https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method convertapi
-```
+With this modern approach:
+1. Run the command directly - no clone needed
+2. Dependencies are automatically managed
+3. Nothing is installed globally on your system
+4. Clean, isolated execution every time
 
 ## Contributing
 
