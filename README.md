@@ -27,9 +27,12 @@ This tool uses [uv](https://github.com/astral-sh/uv) and inline script metadata 
 # Install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Run the script directly (will install dependencies automatically)
-uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py
+# Run the script directly without cloning the repository
+# Dependencies will be installed automatically
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert logo.png logo.svg
 ```
+
+No need to clone the repository or manually install dependencies - just run it directly!
 
 ## Usage
 
@@ -38,44 +41,48 @@ uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py
 Convert a single PNG file to SVG:
 
 ```bash
+# If you've downloaded the script locally:
 uv run png2svg.py convert input.png output.svg
+
+# Or run directly from GitHub:
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg
 ```
 
 ### Using Different Conversion Methods
 
 ```bash
 # Using Potrace
-uv run png2svg.py convert input.png output.svg --method potrace
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method potrace
 
 # Using Aspose.Words API (will automatically add aspose-words dependency)
-uv run --with aspose-words png2svg.py convert input.png output.svg --method aspose
+uv run --with aspose-words https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method aspose
 
 # Using ConvertAPI (requires API key)
 export CONVERTAPI_KEY="your-api-key"
-uv run --with convertapi png2svg.py convert input.png output.svg --method convertapi
+uv run --with convertapi https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method convertapi
 ```
 
 ### Batch Convert Multiple Files
 
 ```bash
 # Convert all PNGs in a directory
-uv run png2svg.py batch input_dir/ output_dir/
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py batch input_dir/ output_dir/
 
 # Convert recursively
-uv run png2svg.py batch input_dir/ output_dir/ --recursive
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py batch input_dir/ output_dir/ --recursive
 ```
 
 ### Advanced Options
 
 ```bash
 # Pass custom options to the converter
-uv run png2svg.py convert input.png output.svg --options "--filter-iterations 4 --dpi 300"
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --options "--filter-iterations 4 --dpi 300"
 
 # Overwrite existing output files
-uv run png2svg.py convert input.png output.svg --overwrite
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --overwrite
 
 # Enable verbose logging
-uv run png2svg.py convert input.png output.svg --verbose
+uv run https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --verbose
 ```
 
 ## External Dependencies
@@ -114,10 +121,10 @@ For Aspose or ConvertAPI methods, the script will notify you if additional depen
 
 ```bash
 # For Aspose method
-uv run --with aspose-words png2svg.py convert input.png output.svg --method aspose
+uv run --with aspose-words https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method aspose
 
 # For ConvertAPI method
-uv run --with convertapi png2svg.py convert input.png output.svg --method convertapi
+uv run --with convertapi https://raw.githubusercontent.com/nicobailon/png2svg/main/png2svg.py convert input.png output.svg --method convertapi
 ```
 
 ## Contributing
