@@ -5,8 +5,8 @@
 #   "pathlib>=1.0.1",
 #   "typer>=0.9.0",
 #   "rich>=13.6.0",
-#   "cairosvg>=2.7.0",
 #   "Pillow>=10.0.0",
+#   "svgwrite>=1.4.3",
 # ]
 # [tool.uv]
 # exclude-newer = "2025-04-09T00:00:00Z"
@@ -22,8 +22,8 @@ Run with: uv run png2svg.py --help
 import os
 import subprocess
 import sys
-import tempfile
 import shutil
+import base64
 from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Tuple, Dict, Any, Union
@@ -37,7 +37,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 from rich.logging import RichHandler
 from PIL import Image
-import cairosvg
+import svgwrite
 
 # Set up rich logging
 logging.basicConfig(
@@ -57,11 +57,11 @@ app = typer.Typer(
 
 class ConversionMethod(str, Enum):
     """Conversion methods available for PNG to SVG conversion."""
-    AUTOTRACE = "autotrace"
-    POTRACE = "potrace"
-    PILLOW = "pillow"
-    ASPOSE = "aspose"
-    CONVERTAPI = "convertapi"
+    NATIVE = "native"      # Built-in Python conversion (default)
+    AUTOTRACE = "autotrace"  # External tool (optional)
+    POTRACE = "potrace"    # External tool (optional)
+    ASPOSE = "aspose"      # Optional Python library
+    CONVERTAPI = "convertapi"  # Optional Python library + API
 
 def ensure_directory(file_path: Union[str, Path]) -> None:
     """
@@ -113,10 +113,10 @@ def is_command_available(command: str) -> bool:
     """
     return shutil.which(command) is not None
 
-def convert_pillow(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
+def convert_native(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
     """
-    Convert PNG to SVG using Pillow and CairoSVG.
-    This is a native Python method that doesn't require external tools.
+    Convert PNG to SVG using native Python libraries (PIL/Pillow and svgwrite).
+    This is a built-in method that doesn't require external tools.
     
     Args:
         input_file: Path to input PNG file
@@ -127,34 +127,44 @@ def convert_pillow(input_file: str, output_file: str, options: Optional[str] = N
         True if conversion was successful, False otherwise
     """
     try:
-        # Use Pillow to read the PNG and CairoSVG to write the SVG
+        # Open the PNG image with Pillow
         img = Image.open(input_file)
-        
-        # Save as an SVG using a simple path approach
-        # We'll create a simple SVG with the image embedded as a data URL
         width, height = img.size
         
-        # Convert to PNG data URL
-        img_buffer = io.BytesIO()
-        img.save(img_buffer, format="PNG")
-        img_data = img_buffer.getvalue()
+        # Create an SVG drawing
+        dwg = svgwrite.Drawing(output_file, size=(width, height))
         
-        # Create a basic SVG with the image embedded
-        svg_content = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-     width="{width}" height="{height}" viewBox="0 0 {width} {height}">
-  <image width="{width}" height="{height}" x="0" y="0" 
-         xlink:href="data:image/png;base64,{img_data.hex()}"/>
-</svg>
-"""
-        
-        # Write the SVG file
-        with open(output_file, 'w') as f:
-            f.write(svg_content)
+        # Add a background rectangle if the image has transparency
+        if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+            # Save image as PNG and encode in base64 for embedding
+            img_buffer = io.BytesIO()
+            img.save(img_buffer, format="PNG")
+            img_b64 = base64.b64encode(img_buffer.getvalue()).decode('ascii')
             
+            # Add the image as an embedded data URL
+            dwg.add(dwg.image(
+                href=f"data:image/png;base64,{img_b64}",
+                insert=(0, 0),
+                size=(width, height)
+            ))
+        else:
+            # For images without transparency, embed them directly
+            img_buffer = io.BytesIO()
+            img.save(img_buffer, format="PNG")
+            img_b64 = base64.b64encode(img_buffer.getvalue()).decode('ascii')
+            
+            dwg.add(dwg.image(
+                href=f"data:image/png;base64,{img_b64}",
+                insert=(0, 0),
+                size=(width, height)
+            ))
+        
+        # Save the SVG file
+        dwg.save()
         return True
+        
     except Exception as e:
-        logger.error(f"Error during conversion with Pillow: {e}")
+        logger.error(f"Error during conversion with PIL/svgwrite: {e}")
         return False
 
 def convert_autotrace(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
@@ -170,11 +180,11 @@ def convert_autotrace(input_file: str, output_file: str, options: Optional[str] 
         True if conversion was successful, False otherwise
     """
     if not is_command_available("autotrace"):
-        logger.warning("AutoTrace is not installed. It's recommended for best results.")
-        logger.warning("Install on Ubuntu/Debian: sudo apt-get install autotrace")
-        logger.warning("Install on macOS: brew install autotrace")
-        logger.warning("Falling back to built-in method...")
-        return convert_pillow(input_file, output_file, options)
+        logger.warning("AutoTrace is not installed. Falling back to native method.")
+        logger.info("To install AutoTrace:")
+        logger.info("  Ubuntu/Debian: sudo apt-get install autotrace")
+        logger.info("  macOS: brew install autotrace")
+        return convert_native(input_file, output_file, options)
     
     cmd = ["autotrace"]
     
@@ -194,7 +204,8 @@ def convert_autotrace(input_file: str, output_file: str, options: Optional[str] 
         logger.error(f"Error during conversion with autotrace: {e}")
         if e.stderr:
             logger.error(f"Error details: {e.stderr}")
-        return False
+        logger.warning("Falling back to native method.")
+        return convert_native(input_file, output_file, options)
 
 def convert_potrace(input_file: str, output_file: str, options: Optional[str] = None) -> bool:
     """
@@ -209,11 +220,11 @@ def convert_potrace(input_file: str, output_file: str, options: Optional[str] = 
         True if conversion was successful, False otherwise
     """
     if not is_command_available("potrace") or not is_command_available("convert"):
-        logger.warning("Potrace or ImageMagick (convert) is not installed.")
-        logger.warning("Install on Ubuntu/Debian: sudo apt-get install potrace imagemagick")
-        logger.warning("Install on macOS: brew install potrace imagemagick")
-        logger.warning("Falling back to built-in method...")
-        return convert_pillow(input_file, output_file, options)
+        logger.warning("Potrace or ImageMagick (convert) is not installed. Falling back to native method.")
+        logger.info("To install Potrace and ImageMagick:")
+        logger.info("  Ubuntu/Debian: sudo apt-get install potrace imagemagick")
+        logger.info("  macOS: brew install potrace imagemagick")
+        return convert_native(input_file, output_file, options)
     
     # Potrace requires a bitmap file, so we need to convert PNG to PBM first
     pbm_file = f"{os.path.splitext(input_file)[0]}.pbm"
@@ -247,10 +258,12 @@ def convert_potrace(input_file: str, output_file: str, options: Optional[str] = 
         logger.error(f"Error during conversion with potrace: {e}")
         if e.stderr:
             logger.error(f"Error details: {e.stderr}")
-        return False
+        logger.warning("Falling back to native method.")
+        return convert_native(input_file, output_file, options)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return False
+        logger.warning("Falling back to native method.")
+        return convert_native(input_file, output_file, options)
 
 def convert_with_library(input_file: str, output_file: str, method: str = 'aspose') -> bool:
     """
@@ -278,11 +291,12 @@ def convert_with_library(input_file: str, output_file: str, method: str = 'aspos
                 return True
             except ImportError:
                 logger.error("Aspose.Words library not found. Use uv run --with aspose-words png2svg.py for Aspose method.")
-                logger.warning("Falling back to built-in method...")
-                return convert_pillow(input_file, output_file)
+                logger.warning("Falling back to native method.")
+                return convert_native(input_file, output_file)
         except Exception as e:
             logger.error(f"Error during conversion with Aspose: {e}")
-            return False
+            logger.warning("Falling back to native method.")
+            return convert_native(input_file, output_file)
     elif method == 'convertapi':
         try:
             # Since we're not including convertapi in the dependencies
@@ -293,8 +307,8 @@ def convert_with_library(input_file: str, output_file: str, method: str = 'aspos
                 api_key = os.environ.get('CONVERTAPI_KEY')
                 if not api_key:
                     logger.error("ConvertAPI key not found. Set the CONVERTAPI_KEY environment variable.")
-                    logger.warning("Falling back to built-in method...")
-                    return convert_pillow(input_file, output_file)
+                    logger.warning("Falling back to native method.")
+                    return convert_native(input_file, output_file)
                 
                 convertapi.api_secret = api_key
                 result = convertapi.convert('svg', {'File': input_file})
@@ -302,19 +316,21 @@ def convert_with_library(input_file: str, output_file: str, method: str = 'aspos
                 return True
             except ImportError:
                 logger.error("ConvertAPI library not found. Use uv run --with convertapi png2svg.py for ConvertAPI method.")
-                logger.warning("Falling back to built-in method...")
-                return convert_pillow(input_file, output_file)
+                logger.warning("Falling back to native method.")
+                return convert_native(input_file, output_file)
         except Exception as e:
             logger.error(f"Error during conversion with ConvertAPI: {e}")
-            return False
+            logger.warning("Falling back to native method.")
+            return convert_native(input_file, output_file)
     else:
         logger.error(f"Unknown conversion method: {method}")
-        return False
+        logger.warning("Falling back to native method.")
+        return convert_native(input_file, output_file)
 
 def png_to_svg(
     input_file: str, 
     output_file: str, 
-    method: str = 'autotrace', 
+    method: str = 'native', 
     options: Optional[str] = None, 
     overwrite: bool = False
 ) -> bool:
@@ -355,17 +371,18 @@ def png_to_svg(
         ) as progress:
             progress.add_task(f"[green]Converting {input_path.name} to {output_path.name}...", total=None)
             
-            if method == 'autotrace':
+            if method == 'native':
+                success = convert_native(str(input_path), output_file, options)
+            elif method == 'autotrace':
                 success = convert_autotrace(str(input_path), output_file, options)
             elif method == 'potrace':
                 success = convert_potrace(str(input_path), output_file, options)
-            elif method == 'pillow':
-                success = convert_pillow(str(input_path), output_file, options)
             elif method in ['aspose', 'convertapi']:
                 success = convert_with_library(str(input_path), output_file, method)
             else:
                 logger.error(f"Unknown conversion method: {method}")
-                return False
+                logger.warning("Falling back to native method.")
+                success = convert_native(str(input_path), output_file, options)
         
         if success:
             console.print(f"[green]Conversion successful! SVG saved at: {output_file}")
@@ -380,7 +397,7 @@ def png_to_svg(
 def batch_convert(
     input_dir: str, 
     output_dir: str, 
-    method: str = 'autotrace', 
+    method: str = 'native', 
     options: Optional[str] = None, 
     overwrite: bool = False, 
     recursive: bool = False
@@ -449,7 +466,7 @@ def convert(
     input_file: str = typer.Argument(..., help="Path to the input PNG file"),
     output_file: str = typer.Argument(..., help="Path to the output SVG file"),
     method: ConversionMethod = typer.Option(
-        ConversionMethod.AUTOTRACE, 
+        ConversionMethod.NATIVE, 
         help="Conversion method to use"
     ),
     options: Optional[str] = typer.Option(
@@ -477,7 +494,7 @@ def batch(
     input_dir: str = typer.Argument(..., help="Directory containing PNG files"),
     output_dir: str = typer.Argument(..., help="Directory to save SVG files"),
     method: ConversionMethod = typer.Option(
-        ConversionMethod.AUTOTRACE, 
+        ConversionMethod.NATIVE, 
         help="Conversion method to use"
     ),
     options: Optional[str] = typer.Option(
@@ -510,9 +527,9 @@ def show_welcome() -> None:
         "[bold blue]PNG to SVG Converter[/bold blue]\n\n"
         "A command line tool to convert PNG images to SVG format using various methods.\n\n"
         "[yellow]Methods available:[/yellow]\n"
-        "- [green]autotrace[/green]: Uses the AutoTrace command-line tool (falls back to Pillow if not available)\n"
-        "- [green]potrace[/green]: Uses Potrace with ImageMagick for preprocessing (falls back to Pillow if not available)\n"
-        "- [green]pillow[/green]: Pure Python conversion using Pillow (always available)\n"
+        "- [green]native[/green]: Pure Python conversion using PIL and svgwrite (default, always works)\n"
+        "- [green]autotrace[/green]: Uses the AutoTrace command-line tool (falls back to native if not available)\n"
+        "- [green]potrace[/green]: Uses Potrace with ImageMagick for preprocessing (falls back to native if not available)\n"
         "- [green]aspose[/green]: Uses the Aspose.Words Python library\n"
         "- [green]convertapi[/green]: Uses the ConvertAPI web service\n\n"
         "[yellow]Examples:[/yellow]\n"
